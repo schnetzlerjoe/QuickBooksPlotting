@@ -1,0 +1,61 @@
+library(readxl)
+library(plotly)
+library(shiny)
+
+ui <- fluidPage(
+    plotlyOutput("plot"),
+    verbatimTextOutput("event")
+)
+
+server <- function(input, output) {
+ 
+    Quickbooks1 <- read_xlsx("Quickbooks2.xlsx", 
+                             sheet = "Profit and Loss")
+    
+    #Clean data
+    Quickbooks1 <- as.data.frame(Quickbooks1)
+    colnames(Quickbooks1) <- Quickbooks1[4,]
+    Quickbooks1 <- Quickbooks1[-1:-4,]
+    Quickbooks1[, "Total"] <- NULL
+    Quickbooks1 <- head(Quickbooks1, -4)
+    Quickbooks1[, 1] <- make.names(Quickbooks1[,1], unique = TRUE)
+    Quickbooks1 <- unique(Quickbooks1)
+    rownames(Quickbooks1) <- Quickbooks1[,1]
+    Quickbooks1 <- Quickbooks1[,-1]
+    
+    #transpose Quickbooks1 for Plot
+    forplot <- as.data.frame(t(Quickbooks1))
+    forplot <- data.frame(rownames(forplot),forplot[, "Total.Income"],forplot[, "Net.Operating.Income"],forplot[, "Gross.Profit"])
+    colnames(forplot) <- c("Date", "Revenue", "Operating Income", "Gross Profit")
+    
+    #round data
+    forplot$Revenue <- round(as.numeric(as.character(forplot$Revenue)), digits = 0)
+    forplot$`Operating Income` <- round(as.numeric(as.character(forplot$`Operating Income`)), digits = 0)
+    forplot$`Gross Profit` <- round(as.numeric(as.character(forplot$`Gross Profit`)), digits = 0)
+    
+    #change col names
+    colnames(forplot) <- c("Date", "Revenue", "Operating Income", "Gross Profit")
+    
+    #set levels so plot is ordered right
+    forplot$Date <- factor(forplot$Date, levels = forplot$Date)
+       
+    # renderPlotly() also understands ggplot2 objects!
+    output$plot <- renderPlotly({
+        plot_ly(x = forplot$Date,y = forplot$`Gross Profit`, type = 'bar', name = "Gross Profit", marker = list(color = '#BFE6F4')) %>%
+            layout(hovermode = 'compare') %>%
+            add_trace(y = forplot$Revenue, name = "Revenue", marker = list(color = '#30AABC')) %>%
+            layout(barmode = 'group') %>%
+            add_trace(y = forplot$`Operating Income`,name = "Operating Income", type = 'scatter', mode = 'lines+markers',
+                      marker = list(
+                          color = 'white',
+                          size = 15, line = list(
+                              color = '#333333',
+                              width = 3)),
+                      line = list(
+                          color = '#333333',
+                          width = 4
+                      ))
+    })
+}
+
+shinyApp(ui, server)
